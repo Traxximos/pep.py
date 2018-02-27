@@ -136,6 +136,89 @@ def fokabotReconnect(fro, chan, message):
 	fokabot.connect()
 	return False
 
+def editMap(fro, chan, message):
+	messages = [m.lower() for m in message]
+	rankType = message[0]
+	mapType = message[1]
+	mapID = message[2]
+
+	# Get persons username & ID
+	name = chat.fixUsernameForBancho(fro)
+	userID = userUtils.getID(fro)
+
+	# Figure out what to do
+	if rankType == 'rank':
+		rankTypeID = 2
+	elif rankType == 'love':
+		rankTypeID = 5
+	elif rankType == 'unrank':
+		rankTypeID = 0
+
+	# Grab beatmapData from db
+	beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
+
+	if mapType == 'set':
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = 1 WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, beatmapData["beatmapset_id"]));
+	elif mapType == 'map':
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = 1 WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, mapID));
+	else:
+		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 1289121'"
+
+	# Announce / Save in Admin Panel when rank is loved/unranked/ranked
+	if rankType == "love":
+		log.rap(userID, "has {}d beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
+		if mapType == 'set':
+			msg = "{} has loved beatmap set: ({})[https://storage.ripple.moe/d/{}]".format(name, beatmapData["song_name"], beatmapData["beatmapset_id"])
+		else:
+			msg = "{} has loved beatmap: ({})[https://relax.akatsuki.pw/b/{}]".format(name, beatmapData["song_name"], mapID)
+	else:
+		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
+		if mapType == 'set':
+			msg = "{} has {}ed beatmap set: ({})[https://storage.ripple.moe/d/{}]".format(name, rankType, beatmapData["song_name"], beatmapData["beatmapset_id"])
+		else:
+			msg = "{} has {}ed beatmap: ({})[https://relax.akatsuki.pw/b/{}]".format(name, rankType, beatmapData["song_name"], mapID)
+	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
+	return msg
+
+def promoteUser(fro, chan, message):
+	messages = [m.lower() for m in message]
+	target = message[0]
+	privilege = message[1]
+
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	if privilege == 'user':
+		priv = 3
+	elif privilege == 'bat':
+		priv = 267
+	elif privilege == 'mod':
+		priv = 786763
+	elif privilege == 'tournamentstaff':
+		priv = 2097159
+	elif privilege == 'admin':
+		priv = 3047935
+	elif privilege == 'developer':
+		priv = 3145727
+	elif privilege == 'owner':
+		priv = 7340031
+	else:
+		return "Invalid rankname (bat/mod/tournamentstaff/admin/developer/owner)"
+
+	try:
+		glob.db.execute("UPDATE users SET privileges = %s WHERE id = %s LIMIT 1", [priv, targetUserID])
+	except:
+		return "An unknown error has occured while trying to set role."
+
+	# Log message
+	log.rap(userID, "set {} to {}.".format(target, privilege), True)
+	msg = "{} has been promoted to: {}".format(target, privilege)
+	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
+	return msg
+
 def silence(fro, chan, message):
 	for i in message:
 		i = i.lower()
@@ -348,7 +431,7 @@ def systemStatus(fro, chan, message):
 		letsVersion = letsVersion.decode("utf-8")
 	msg = "pep.py bancho server v{}\n".format(glob.VERSION)
 	msg += "LETS scores server v{}\n".format(letsVersion)
-	msg += "made by the Ripple team\n"
+	msg += "made by the Ripple & Akatsuki team\n"
 	msg += "\n"
 	msg += "=== BANCHO STATS ===\n"
 	msg += "Connected users: {}\n".format(data["connectedUsers"])
@@ -563,7 +646,6 @@ def tillerinoLast(fro, chan, message):
 		# Run the command in PM only
 		if chan.startswith("#"):
 			return False
-
 		data = glob.db.fetch("""SELECT beatmaps.song_name as sn, scores.*,
 			beatmaps.beatmap_id as bid, beatmaps.difficulty_std, beatmaps.difficulty_taiko, beatmaps.difficulty_ctb, beatmaps.difficulty_mania, beatmaps.max_combo as fc
 		FROM scores
@@ -1131,12 +1213,20 @@ commands = [
 		"callback": report
 	}, {
 		"trigger": "!help",
-		"response": "Click (here)[https://ripple.moe/index.php?p=16&id=4] for the full command list"
-	}, #{
-		#"trigger": "!ask",
-		#"syntax": "<question>",
-		#"callback": ask
-	#}, {
+		"response": "Click (here)[https://osu.akatsuki.pw/index.php?p=16&id=4] for the full command list"
+	},
+	{
+		"trigger": "!map",
+		"syntax": "<rank/unrank/love> <set/map> <ID>",
+		"privileges": privileges.ADMIN_MANAGE_BEATMAPS,
+		"callback": editMap
+	},
+	{
+		"trigger": "!priv",
+		"syntax": "<userID> <rank>",
+		"privileges": privileges.ADMIN_MANAGE_USERS,
+		"callback": promoteUser
+	},
 	{
 		"trigger": "!mm00",
 		"callback": mm00

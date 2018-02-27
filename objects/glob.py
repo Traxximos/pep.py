@@ -17,8 +17,8 @@ try:
 except:
 	VERSION = "Unknown"
 
-DATADOG_PREFIX = "peppy"
-BOT_NAME = "FokaBot"
+DATADOG_PREFIX = "RegularBancho"
+BOT_NAME = "Charlotte"
 application = None
 db = None
 redis = None

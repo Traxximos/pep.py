@@ -166,6 +166,7 @@ def handle(tornadoRequest):
 		# TODO: Configurable default channels
 		chat.joinChannel(token=responseToken, channel="#osu")
 		chat.joinChannel(token=responseToken, channel="#announce")
+		chat.joinChannel(token=responseToken, channel="#nowranked")
 
 		# Join admin channel if we are an admin
 		if responseToken.admin:
@@ -190,7 +191,7 @@ def handle(tornadoRequest):
 					responseToken.enqueue(serverPackets.userPanel(token.userID))
 
 		# Get location and country from ip.zxq.co or database
-		if glob.localize:
+		if glob.localize and (firstLogin == True or responseToken.privileges & privileges.USER_DONOR <= 0):
 			# Get location and country from IP
 			latitude, longitude = locationHelper.getLocation(requestIP)
 			countryLetters = locationHelper.getCountry(requestIP)

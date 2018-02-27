@@ -487,7 +487,7 @@ class token:
 		:return:
 		"""
 		self.restricted = True
-		chat.sendMessage(glob.BOT_NAME, self.username, "Your account is currently in restricted mode. Please visit ripple's website for more information.")
+		chat.sendMessage(glob.BOT_NAME, self.username, "Your account is currently in restricted mode. Please visit (Akatsuki's website)[https://osu.akatsuki.pw] for more information.")
 
 	def resetRestricted(self):
 		"""
