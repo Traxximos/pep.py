@@ -170,14 +170,14 @@ def editMap(fro, chan, message):
 		if mapType == 'set':
 			msg = "{} has loved beatmap set: ({})[https://storage.ripple.moe/d/{}]".format(name, beatmapData["song_name"], beatmapData["beatmapset_id"])
 		else:
-			msg = "{} has loved beatmap: ({})[https://relax.akatsuki.pw/b/{}]".format(name, beatmapData["song_name"], mapID)
+			msg = "{} has loved beatmap: ({})[https://osu.akatsuki.pw/b/{}]".format(name, beatmapData["song_name"], mapID)
 	else:
 		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
 		if mapType == 'set':
 			msg = "{} has {}ed beatmap set: ({})[https://storage.ripple.moe/d/{}]".format(name, rankType, beatmapData["song_name"], beatmapData["beatmapset_id"])
 		else:
-			msg = "{} has {}ed beatmap: ({})[https://relax.akatsuki.pw/b/{}]".format(name, rankType, beatmapData["song_name"], mapID)
-	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
+			msg = "{} has {}ed beatmap: ({})[https://osu.akatsuki.pw/b/{}]".format(name, rankType, beatmapData["song_name"], mapID)
+	chat.sendMessage(glob.BOT_NAME, "#nowranked", msg)
 	return msg
 
 def promoteUser(fro, chan, message):
@@ -215,7 +215,7 @@ def promoteUser(fro, chan, message):
 
 	# Log message
 	log.rap(userID, "set {} to {}.".format(target, privilege), True)
-	msg = "{} has been promoted to: {}".format(target, privilege)
+	msg = "{} has been set to rank: {}.".format(target, privilege)
 	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
 	return msg
 
@@ -765,18 +765,20 @@ def updateBeatmap(fro, chan, message):
 def report(fro, chan, message):
 	msg = ""
 	try:
+		for i in message:
+			i = i.lower()
+		target = message[0]
+		reason = ' '.join(message[1:])
 		# TODO: Rate limit
 		# Regex on message
-		reportRegex = re.compile("^(.+) \((.+)\)\:(?: )?(.+)?$")
-		result = reportRegex.search(" ".join(message))
 
 		# Make sure the message matches the regex
-		if result is None:
+		if reason is None:
 			raise exceptions.invalidArgumentsException()
 
 		# Get username, report reason and report info
-		target, reason, additionalInfo = result.groups()
 		target = chat.fixUsernameForBancho(target)
+		name = chat.fixUsernameForBancho(fro)
 
 		# Make sure the target is not foka
 		if target.lower() == glob.BOT_NAME.lower():
@@ -787,10 +789,6 @@ def report(fro, chan, message):
 		if targetID == 0:
 			raise exceptions.userNotFoundException()
 
-		# Make sure that the user has specified additional info if report reason is 'Other'
-		if reason.lower() == "other" and additionalInfo is None:
-			raise exceptions.missingReportInfoException()
-
 		# Get the token if possible
 		chatlog = ""
 		token = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
@@ -798,9 +796,9 @@ def report(fro, chan, message):
 			chatlog = token.getMessagesBufferString()
 
 		# Everything is fine, submit report
-		glob.db.execute("INSERT INTO reports (id, from_uid, to_uid, reason, chatlog, time) VALUES (NULL, %s, %s, %s, %s, %s)", [userUtils.getID(fro), targetID, "{reason} - ingame {info}".format(reason=reason, info="({})".format(additionalInfo) if additionalInfo is not None else ""), chatlog, int(time.time())])
-		msg = "You've reported {target} for {reason}{info}. A Community Manager will check your report as soon as possible. Every !report message you may see in chat wasn't sent to anyone, so nobody in chat, but admins, know about your report. Thank you for reporting!".format(target=target, reason=reason, info="" if additionalInfo is None else " (" + additionalInfo + ")")
-		adminMsg = "{user} has reported {target} for {reason} ({info})".format(user=fro, target=target, reason=reason, info=additionalInfo)
+		glob.db.execute("INSERT INTO reports (id, from_username, name, from_uid, to_uid, content, chatlog, open_time) VALUES (NULL, %s, %s, %s, %s, %s, %s, %s)", [target, name, userUtils.getID(fro), targetID, reason, chatlog, int(time.time())])
+		msg = "You've reported {target} for {reason}. Thank you for reporting! Your report will be checked by the admins of Akatsuki soon!".format(target=target, reason=reason)
+		adminMsg = "{user} has reported {target} for {reason}".format(user=fro, target=target, reason=reason)
 
 		# Log report in #admin and on discord
 		chat.sendMessage(glob.BOT_NAME, "#admin", adminMsg)
@@ -808,11 +806,9 @@ def report(fro, chan, message):
 	except exceptions.invalidUserException:
 		msg = "Hello, {} here! You can't report me. I won't forget what you've tried to do. Watch out.".format(glob.BOT_NAME)
 	except exceptions.invalidArgumentsException:
-		msg = "Invalid report command syntax. To report an user, click on it and select 'Report user'."
+		msg = "Please specify a reason for the report."
 	except exceptions.userNotFoundException:
-		msg = "The user you've tried to report doesn't exist."
-	except exceptions.missingReportInfoException:
-		msg = "Please specify the reason of your report."
+		msg = "The user you've tried to report doesn't exist. If their username contains a space, use an underscore instead."
 	except:
 		raise
 	finally:
