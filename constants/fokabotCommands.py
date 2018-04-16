@@ -1244,7 +1244,7 @@ commands = [
 		"callback": report
 	}, {
 		"trigger": "!help",
-		"response": "Click (here)[https://osu.cmyui.com/index.php?p=16&id=4] for the full command list"
+		"response": "Click (here)[https://osu.akatsuki.pw/doc/3] for the full command list"
 	}, #{
 		#"trigger": "!ask",
 		#"syntax": "<question>",
