@@ -35,7 +35,7 @@ return the message or **False** if there's no response by the bot
 TODO: Change False to None, because False doesn't make any sense
 """
 def instantRestart(fro, chan, message):
-	glob.streams.broadcast("main", serverPackets.notification("We are restarting Bancho. Be right back!"))
+	glob.streams.broadcast("main", serverPackets.notification("Bancho is restarting, it will be back online momentarily.."))
 	systemHelper.scheduleShutdown(0, True, delay=5)
 	return False
 
@@ -92,7 +92,7 @@ def moderated(fro, chan, message):
 		glob.channels.channels[chan].moderated = enable
 		return "This channel is {} in moderated mode!".format("now" if enable else "no longer")
 	except exceptions.moderatedPMException:
-		return "You are trying to put a private chat in moderated mode. Are you serious?!? You're fired."
+		return "You cannot put a private chat in moderated mode.. Duh"
 
 def kickAll(fro, chan, message):
 	# Kick everyone but mods/admins
@@ -136,7 +136,7 @@ def fokabotReconnect(fro, chan, message):
 	fokabot.connect()
 	return False
 
-def editMap(fro, chan, message):
+def editMap(fro, chan, message): # Proudly made in Canada with love by cmyui
 	messages = [m.lower() for m in message]
 	rankType = message[0]
 	mapType = message[1]
@@ -149,36 +149,62 @@ def editMap(fro, chan, message):
 	# Figure out what to do
 	if rankType == 'rank':
 		rankTypeID = 2
+		freezeStatus = 1
 	elif rankType == 'love':
 		rankTypeID = 5
+		freezeStatus = 1
 	elif rankType == 'unrank':
 		rankTypeID = 0
+		freezeStatus = 0
 
 	# Grab beatmapData from db
 	beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
 
 	if mapType == 'set':
-		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = 1 WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, beatmapData["beatmapset_id"]));
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, freezeStatus, beatmapData["beatmapset_id"]))
+		if freezeStatus == 1:
+				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
+					WHERE beatmapset_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmapset_id"]))
 	elif mapType == 'map':
-		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = 1 WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, mapID));
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, mapID))
+		if freezeStatus == 1:
+				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
+					WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmap_id"]))
 	else:
-		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 1289121'"
+		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 123456'"
 
-	# Announce / Save in Admin Panel when rank is loved/unranked/ranked
+	# Announce / Log to AP logs when ranked status is changed
 	if rankType == "love":
 		log.rap(userID, "has {}d beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
 		if mapType == 'set':
-			msg = "{} has loved beatmap set: ({})[https://storage.ripple.moe/d/{}]".format(name, beatmapData["song_name"], beatmapData["beatmapset_id"])
+			msg = "{} has loved beatmap set: ({})[https://osu.ppy.sh/s/{}]".format(name, beatmapData["song_name"], beatmapData["beatmapset_id"])
 		else:
 			msg = "{} has loved beatmap: ({})[https://osu.akatsuki.pw/b/{}]".format(name, beatmapData["song_name"], mapID)
 	else:
 		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
 		if mapType == 'set':
-			msg = "{} has {}ed beatmap set: ({})[https://storage.ripple.moe/d/{}]".format(name, rankType, beatmapData["song_name"], beatmapData["beatmapset_id"])
+			msg = "{} has {}ed beatmap set: ({})[https://osu.ppy.sh/s/{}]".format(name, rankType, beatmapData["song_name"], beatmapData["beatmapset_id"])
 		else:
 			msg = "{} has {}ed beatmap: ({})[https://osu.akatsuki.pw/b/{}]".format(name, rankType, beatmapData["song_name"], mapID)
 	chat.sendMessage(glob.BOT_NAME, "#nowranked", msg)
 	return msg
+
+def runSQL(fro, chan, message): # Obviously not the safest command..
+	messages = [m.lower() for m in message]
+	command = ' '.join(message[0:])
+
+	userID = userUtils.getID(fro)
+
+	if userID == 1001: # Just cmyui owo
+		if len(command) < 10: # Catch this so it doesnt say it failed when it kinda didnt even though it did what the fuck am i typing anymore
+			return "Query length too short.. You're probably doing something wrong."
+		try:
+			glob.db.execute(command)
+		except:
+			return "Could not successfully execute query"
+	else:
+		return "You lack sufficient permissions to execute this query"
+	return "Query executed successfully"
 
 def promoteUser(fro, chan, message):
 	messages = [m.lower() for m in message]
@@ -215,7 +241,7 @@ def promoteUser(fro, chan, message):
 
 	# Log message
 	log.rap(userID, "set {} to {}.".format(target, privilege), True)
-	msg = "{} has been set to rank: {}.".format(target, privilege)
+	msg = "{}'s rank has been set to: {}".format(target, privilege)
 	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
 	return msg
 
@@ -249,7 +275,7 @@ def silence(fro, chan, message):
 
 	# Max silence time is 7 days
 	if silenceTime > 604800:
-		return "Invalid silence time. Max silence time is 7 days."
+		return "Invalid silence time. The maximum silence time is 7 days."
 
 	# Send silence packet to target if he's connected
 	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
@@ -308,7 +334,7 @@ def ban(fro, chan, message):
 		targetToken.enqueue(serverPackets.loginBanned())
 
 	log.rap(userID, "has banned {}".format(target), True)
-	return "RIP {}. You will not be missed.".format(target)
+	return "{} has been banned.".format(target)
 
 def unban(fro, chan, message):
 	# Get parameters
@@ -326,7 +352,7 @@ def unban(fro, chan, message):
 	userUtils.unban(targetUserID)
 
 	log.rap(userID, "has unbanned {}".format(target), True)
-	return "Welcome back {}!".format(target)
+	return "{} has been unbanned.".format(target)
 
 def restrict(fro, chan, message):
 	# Get parameters
@@ -349,7 +375,7 @@ def restrict(fro, chan, message):
 		targetToken.setRestricted()
 
 	log.rap(userID, "has put {} in restricted mode".format(target), True)
-	return "Bye bye {}. See you later, maybe.".format(target)
+	return "{} has been restricted.".format(target)
 
 def unrestrict(fro, chan, message):
 	# Get parameters
@@ -367,7 +393,7 @@ def unrestrict(fro, chan, message):
 	userUtils.unrestrict(targetUserID)
 
 	log.rap(userID, "has removed restricted mode from {}".format(target), True)
-	return "Welcome back {}!".format(target)
+	return "{} has been unrestricted.".format(target)
 
 def restartShutdown(restart):
 	"""Restart (if restart = True) or shutdown (if restart = False) pep.py safely"""
@@ -431,7 +457,7 @@ def systemStatus(fro, chan, message):
 		letsVersion = letsVersion.decode("utf-8")
 	msg = "pep.py bancho server v{}\n".format(glob.VERSION)
 	msg += "LETS scores server v{}\n".format(letsVersion)
-	msg += "made by the Ripple & Akatsuki team\n"
+	msg += "made by the Ripple & Akatsuki teams\n"
 	msg += "\n"
 	msg += "=== BANCHO STATS ===\n"
 	msg += "Connected users: {}\n".format(data["connectedUsers"])
@@ -706,10 +732,6 @@ def tillerinoLast(fro, chan, message):
 		log.error(a)
 		return False
 
-def mm00(fro, chan, message):
-	random.seed()
-	return random.choice(["meme", "MA MAURO ESISTE?"])
-
 def pp(fro, chan, message):
 	if chan.startswith("#"):
 		return False
@@ -847,6 +869,21 @@ def multiplayer(fro, chan, message):
 		userToken = glob.tokens.getTokenFromUsername(fro, ignoreIRC=True)
 		userToken.joinMatch(matchID)
 		return "Attempting to join match #{}!".format(matchID)
+
+	def mpForce():
+		username = message[1]
+		matchID = int(message[2])
+
+		userToken = glob.tokens.getTokenFromUsername(username, ignoreIRC=True)
+		if userToken is None:
+			return "No such user"
+
+		try:
+			userToken.joinMatch(matchID)
+		except:
+			return "Could not find multiplayer match {}".format(matchID)
+
+		return "Attempting to force user {} into match #{}!".format(username, matchID)
 
 	def mpClose():
 		matchID = getMatchIDFromChannel(chan)
@@ -1124,6 +1161,7 @@ def multiplayer(fro, chan, message):
 			"make": mpMake,
 			"close": mpClose,
 			"join": mpJoin,
+			"force": mpForce,
 			"lock": mpLock,
 			"unlock": mpUnlock,
 			"size": mpSize,
@@ -1184,9 +1222,6 @@ def rtx(fro, chan, message):
 	userToken.enqueue(serverPackets.rtx(message))
 	return ":ok_hand:"
 
-
-
-
 """
 Commands list
 
@@ -1209,8 +1244,12 @@ commands = [
 		"callback": report
 	}, {
 		"trigger": "!help",
-		"response": "Click (here)[https://osu.akatsuki.pw/index.php?p=16&id=4] for the full command list"
-	},
+		"response": "Click (here)[https://osu.cmyui.com/index.php?p=16&id=4] for the full command list"
+	}, #{
+		#"trigger": "!ask",
+		#"syntax": "<question>",
+		#"callback": ask
+	#}, {
 	{
 		"trigger": "!map",
 		"syntax": "<rank/unrank/love> <set/map> <ID>",
@@ -1222,10 +1261,6 @@ commands = [
 		"syntax": "<userID> <rank>",
 		"privileges": privileges.ADMIN_MANAGE_USERS,
 		"callback": promoteUser
-	},
-	{
-		"trigger": "!mm00",
-		"callback": mm00
 	}, {
 		"trigger": "!alert",
 		"syntax": "<message>",
@@ -1245,6 +1280,10 @@ commands = [
 		"privileges": privileges.ADMIN_MANAGE_SERVERS,
 		"callback": kickAll
 	}, {
+		"trigger": "!query",
+		"privileges": privileges.ADMIN_MANAGE_SERVERS,
+		"callback": runSQL
+	}, {
 		"trigger": "!kick",
 		"syntax": "<target>",
 		"privileges": privileges.ADMIN_KICK_USERS,
@@ -1259,7 +1298,7 @@ commands = [
 		"privileges": privileges.ADMIN_SILENCE_USERS,
 		"callback": silence
 	}, {
-		"trigger": "!removesilence",
+		"trigger": "!unsilence",
 		"syntax": "<target>",
 		"privileges": privileges.ADMIN_SILENCE_USERS,
 		"callback": removeSilence
