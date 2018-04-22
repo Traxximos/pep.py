@@ -42,7 +42,6 @@ def instantRestart(fro, chan, message):
 def faq(fro, chan, message):
 	if message[0] in glob.conf.extra["faq"]:
 		return glob.conf.extra["faq"][message[0]]
-	
 	return False
 
 def roll(fro, chan, message):
@@ -177,15 +176,15 @@ def editMap(fro, chan, message): # Proudly made in Canada with love by cmyui
 	if rankType == "love":
 		log.rap(userID, "has {}d beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
 		if mapType == 'set':
-			msg = "{} has loved beatmap set: ({})[https://osu.ppy.sh/s/{}]".format(name, beatmapData["song_name"], beatmapData["beatmapset_id"])
+			msg = "{} has loved beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, beatmapData["beatmapset_id"], beatmapData["song_name"])
 		else:
-			msg = "{} has loved beatmap: ({})[https://osu.akatsuki.pw/b/{}]".format(name, beatmapData["song_name"], mapID)
+			msg = "{} has loved beatmap: [https://osu.akatsuki.pw/b/{} {}]".format(name, mapID, beatmapData["song_name"])
 	else:
 		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
 		if mapType == 'set':
-			msg = "{} has {}ed beatmap set: ({})[https://osu.ppy.sh/s/{}]".format(name, rankType, beatmapData["song_name"], beatmapData["beatmapset_id"])
+			msg = "{} has {}ed beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, rankType, beatmapData["beatmapset_id"], beatmapData["song_name"])
 		else:
-			msg = "{} has {}ed beatmap: ({})[https://osu.akatsuki.pw/b/{}]".format(name, rankType, beatmapData["song_name"], mapID)
+			msg = "{} has {}ed beatmap: [https://osu.akatsuki.pw/b/{} {}]".format(name, rankType, mapID, beatmapData["song_name"])
 	chat.sendMessage(glob.BOT_NAME, "#nowranked", msg)
 	return msg
 
@@ -205,6 +204,12 @@ def runSQL(fro, chan, message): # Obviously not the safest command..
 	else:
 		return "You lack sufficient permissions to execute this query"
 	return "Query executed successfully"
+
+def postAnnouncement(fro, chan, message): # Post to #announce ingame
+	messgaes = [m.lower() for m in message]
+	announcement = ' '.join(message[0:])
+	chat.sendMessage(glob.BOT_NAME, "#announce", announcement)
+	return "Announcement successfully sent."
 
 def promoteUser(fro, chan, message):
 	messages = [m.lower() for m in message]
@@ -1261,6 +1266,11 @@ commands = [
 		"syntax": "<userID> <rank>",
 		"privileges": privileges.ADMIN_MANAGE_USERS,
 		"callback": promoteUser
+	}, {
+		"trigger": "!announce",
+		"syntax": "<announcement>",
+		"privileges": privileges.ADMIN_SEND_ALERTS,
+		"callback": postAnnouncement
 	}, {
 		"trigger": "!alert",
 		"syntax": "<message>",
