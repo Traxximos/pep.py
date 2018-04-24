@@ -135,121 +135,6 @@ def fokabotReconnect(fro, chan, message):
 	fokabot.connect()
 	return False
 
-def editMap(fro, chan, message): # Proudly made in Canada with love by cmyui
-	messages = [m.lower() for m in message]
-	rankType = message[0]
-	mapType = message[1]
-	mapID = message[2]
-
-	# Get persons username & ID
-	name = chat.fixUsernameForBancho(fro)
-	userID = userUtils.getID(fro)
-
-	# Figure out what to do
-	if rankType == 'rank':
-		rankTypeID = 2
-		freezeStatus = 1
-	elif rankType == 'love':
-		rankTypeID = 5
-		freezeStatus = 1
-	elif rankType == 'unrank':
-		rankTypeID = 0
-		freezeStatus = 0
-
-	# Grab beatmapData from db
-	beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
-
-	if mapType == 'set':
-		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, freezeStatus, beatmapData["beatmapset_id"]))
-		if freezeStatus == 1:
-				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
-					WHERE beatmapset_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmapset_id"]))
-	elif mapType == 'map':
-		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, mapID))
-		if freezeStatus == 1:
-				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
-					WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmap_id"]))
-	else:
-		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 123456'"
-
-	# Announce / Log to AP logs when ranked status is changed
-	if rankType == "love":
-		log.rap(userID, "has {}d beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
-		if mapType == 'set':
-			msg = "{} has loved beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, beatmapData["beatmapset_id"], beatmapData["song_name"])
-		else:
-			msg = "{} has loved beatmap: [https://osu.akatsuki.pw/b/{} {}]".format(name, mapID, beatmapData["song_name"])
-	else:
-		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
-		if mapType == 'set':
-			msg = "{} has {}ed beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, rankType, beatmapData["beatmapset_id"], beatmapData["song_name"])
-		else:
-			msg = "{} has {}ed beatmap: [https://osu.akatsuki.pw/b/{} {}]".format(name, rankType, mapID, beatmapData["song_name"])
-	chat.sendMessage(glob.BOT_NAME, "#nowranked", msg)
-	return msg
-
-def runSQL(fro, chan, message): # Obviously not the safest command..
-	messages = [m.lower() for m in message]
-	command = ' '.join(message[0:])
-
-	userID = userUtils.getID(fro)
-
-	if userID == 1001: # Just cmyui owo
-		if len(command) < 10: # Catch this so it doesnt say it failed when it kinda didnt even though it did what the fuck am i typing anymore
-			return "Query length too short.. You're probably doing something wrong."
-		try:
-			glob.db.execute(command)
-		except:
-			return "Could not successfully execute query"
-	else:
-		return "You lack sufficient permissions to execute this query"
-	return "Query executed successfully"
-
-def postAnnouncement(fro, chan, message): # Post to #announce ingame
-	messgaes = [m.lower() for m in message]
-	announcement = ' '.join(message[0:])
-	chat.sendMessage(glob.BOT_NAME, "#announce", announcement)
-	return "Announcement successfully sent."
-
-def promoteUser(fro, chan, message):
-	messages = [m.lower() for m in message]
-	target = message[0]
-	privilege = message[1]
-
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	if privilege == 'user':
-		priv = 3
-	elif privilege == 'bat':
-		priv = 267
-	elif privilege == 'mod':
-		priv = 786763
-	elif privilege == 'tournamentstaff':
-		priv = 2097159
-	elif privilege == 'admin':
-		priv = 3047935
-	elif privilege == 'developer':
-		priv = 3145727
-	elif privilege == 'owner':
-		priv = 7340031
-	else:
-		return "Invalid rankname (bat/mod/tournamentstaff/admin/developer/owner)"
-
-	try:
-		glob.db.execute("UPDATE users SET privileges = %s WHERE id = %s LIMIT 1", [priv, targetUserID])
-	except:
-		return "An unknown error has occured while trying to set role."
-
-	# Log message
-	log.rap(userID, "set {} to {}.".format(target, privilege), True)
-	msg = "{}'s rank has been set to: {}".format(target, privilege)
-	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
-	return msg
-
 def silence(fro, chan, message):
 	for i in message:
 		i = i.lower()
@@ -449,6 +334,7 @@ def systemMaintenance(fro, chan, message):
 
 	# Chat output
 	return msg
+
 
 def systemStatus(fro, chan, message):
 	# Print some server info
@@ -789,6 +675,9 @@ def updateBeatmap(fro, chan, message):
 	except:
 		return False
 
+
+	# cmyui section that cmyui coded and cmyui did it no matter what any other retard says >:((((((((((
+
 def report(fro, chan, message):
 	msg = ""
 	try:
@@ -847,6 +736,247 @@ def report(fro, chan, message):
 				else:
 					token.enqueue(serverPackets.notification(msg))
 	return False
+
+def changeUsername(fro, chan, message): # Change a users username, ingame.
+	messages = [m.lower() for m in message]
+	target = message[0]
+	newUsername = message[1]
+
+	if target == glob.BOT_NAME.lower():
+		return "Nope."
+
+	# Grab userID & Token
+	userID = userUtils.getIDSafe(target)
+	tokens = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True, _all=True)
+	idkWhyICantUseThePreviousOne = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+
+	# Change their username
+	userUtils.changeUsername(userID, target, newUsername)
+
+	# Ensure they are online (since it's only nescessary to kick/alert them if they're online), then do so if they are.
+	if len(tokens) == 0:
+		return "{} is not online".format(target)
+	idkWhyICantUseThePreviousOne.enqueue(serverPackets.notification("Your name has been changed to {}. Please relogin using that name.".format(newUsername)))
+
+	# Kick users
+	for i in tokens:
+		i.kick()
+
+	log.rap(userID, "has changed {}'s username to {}.".format(target, newUsername))
+	return "Name successfully changed. It might take a while to change the username if the user is online on Bancho."
+
+def editMap(fro, chan, message): # Edit maps ranking status ingame.
+	messages = [m.lower() for m in message]
+	rankType = message[0]
+	mapType = message[1]
+	mapID = message[2]
+
+	# Get persons username & ID
+	name = chat.fixUsernameForBancho(fro)
+	userID = userUtils.getID(fro)
+
+	# Figure out what to do
+	if rankType == 'rank':
+		rankTypeID = 2
+		freezeStatus = 1
+	elif rankType == 'love':
+		rankTypeID = 5
+		freezeStatus = 1
+	elif rankType == 'unrank':
+		rankTypeID = 0
+		freezeStatus = 0
+
+	# Grab beatmapData from db
+	beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
+
+	if mapType == 'set':
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, freezeStatus, beatmapData["beatmapset_id"]))
+		if freezeStatus == 1:
+				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
+					WHERE beatmapset_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmapset_id"]))
+	elif mapType == 'map':
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, mapID))
+		if freezeStatus == 1:
+				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
+					WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmap_id"]))
+	else:
+		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 123456'"
+
+	# Announce / Log to AP logs when ranked status is changed
+	if rankType == "love":
+		log.rap(userID, "has {}d beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
+		if mapType == 'set':
+			msg = "{} has loved beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, beatmapData["beatmapset_id"], beatmapData["song_name"])
+		else:
+			msg = "{} has loved beatmap: [https://osu.akatsuki.pw/b/{} {}]".format(name, mapID, beatmapData["song_name"])
+	else:
+		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
+		if mapType == 'set':
+			msg = "{} has {}ed beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, rankType, beatmapData["beatmapset_id"], beatmapData["song_name"])
+		else:
+			msg = "{} has {}ed beatmap: [https://osu.akatsuki.pw/b/{} {}]".format(name, rankType, mapID, beatmapData["song_name"])
+	chat.sendMessage(glob.BOT_NAME, "#nowranked", msg)
+	return msg
+
+def runSQL(fro, chan, message): # Obviously not the safest command.. Run SQL queries ingame!
+	messages = [m.lower() for m in message]
+	command = ' '.join(message[0:])
+
+	userID = userUtils.getID(fro)
+
+	if userID == 1001: # Just cmyui owo
+		if len(command) < 10: # Catch this so it doesnt say it failed when it kinda didnt even though it did what the fuck am i typing anymore
+			return "Query length too short.. You're probably doing something wrong."
+		try:
+			glob.db.execute(command)
+		except:
+			return "Could not successfully execute query"
+	else:
+		return "You lack sufficient permissions to execute this query"
+	return "Query executed successfully"
+
+def postAnnouncement(fro, chan, message): # Post to #announce ingame
+	messgaes = [m.lower() for m in message]
+	announcement = ' '.join(message[0:])
+	chat.sendMessage(glob.BOT_NAME, "#announce", announcement)
+	return "Announcement successfully sent."
+
+def promoteUser(fro, chan, message): # Set a users privileges ingame
+	messages = [m.lower() for m in message]
+	target = message[0]
+	privilege = message[1]
+
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	if privilege == 'user':
+		priv = 3
+	elif privilege == 'bat':
+		priv = 267
+	elif privilege == 'mod':
+		priv = 786763
+	elif privilege == 'tournamentstaff':
+		priv = 2097159
+	elif privilege == 'admin':
+		priv = 3047935
+	elif privilege == 'developer':
+		priv = 3145727
+	elif privilege == 'owner':
+		priv = 7340031
+	else:
+		return "Invalid rankname (bat/mod/tournamentstaff/admin/developer/owner)"
+
+	try:
+		glob.db.execute("UPDATE users SET privileges = %s WHERE id = %s LIMIT 1", [priv, targetUserID])
+	except:
+		return "An unknown error has occured while trying to set role."
+
+	# Log message
+	log.rap(userID, "set {} to {}.".format(target, privilege), True)
+	msg = "{}'s rank has been set to: {}".format(target, privilege)
+	chat.sendMessage(glob.BOT_NAME, "#announce", msg)
+	return msg
+
+def rtxMurder(fro, chan, message):
+	target = message[0]
+	number = message[1]
+	message = " ".join(message[2:])
+
+	userID = userUtils.getID(fro)
+
+	if userID != 1001: # Just cmyui owo
+		return "Sorry but only cmyui himself may use this command.."
+
+	if not number.isdigit():
+		return "Please specify a count, I.E !imsosorry 100 cmyui xd"
+
+	targetUserID = userUtils.getIDSafe(target)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+	userToken = glob.tokens.getTokenFromUserID(targetUserID, ignoreIRC=True, _all=False)
+	base = 1
+	while base < number:
+		base = base + 1
+		userToken.enqueue(serverPackets.rtx(message))
+	return "their poor souls will remember this for eternity.."
+
+def recommendMap(fro, chan, message):
+	messages = [m.lower() for m in message]
+	try:
+		diffmode = message[0]
+		if chan.startswith("#"):
+			return False
+		# Probably the hardest thing I've ever attempted to code (made by cmyui winky face emoji :cowboy:)
+		# Currently only works on nomod because idk how to code
+		userID = userUtils.getIDSafe(fro)
+
+		# Specify gamemode. recommend PP to the User
+		if not diffmode.isdigit():
+			if diffmode == "std":
+				modeName = "std"
+				modeID = 0
+			elif diffmode == "taiko":
+				modeName = "taiko"
+				modeID = 1
+			elif diffmode == "ctb":
+				modeName = "ctb"
+				modeID = 2
+			elif diffmode == "mania":
+				modeName = "mania"
+				modeID = 3
+			else:
+				return "Please enter a valid gamemode."
+
+			# Calculate what sort of PP amounts we should be recommending based on the average of their top 10 plays
+			userPPData = glob.db.fetch("SELECT AVG(pp) FROM (SELECT pp FROM scores WHERE userid = {} AND play_mode = {} ORDER BY pp DESC LIMIT 10) AS topplays".format(userID, modeID))
+
+			"""
+			if not pp in userPPData:
+				return "You do not have enough scores in this gamemode to have any recommendations."
+			"""
+
+			#Determine what amount of PP we should recommend them
+			rawrecommendedPP = userPPData.values()
+			recommendedPP = 0
+			for val in rawrecommendedPP:
+				recommendedPP += val
+
+			# Determine the amount of variance
+			ppVariance = recommendedPP / 15
+			ppBelow = recommendedPP - ppVariance
+			ppAbove = recommendedPP + ppVariance
+
+			recommendedMaps = glob.db.fetch("SELECT beatmap_id, song_name, ar, od, bpm, difficulty_{}, max_combo, pp_100, pp_99, pp_98, pp_95 FROM beatmaps WHERE ranked = 2 AND ((pp_95 > {} AND pp_95 < {}) OR (pp_98 > {} AND pp_98 < {}) OR (pp_99 > {} AND pp_99 < {}) OR (pp_100 > {} AND pp_100 < {})) AND mode = {} ORDER BY RAND() LIMIT 1".format(modeName, ppBelow, ppAbove, ppBelow, ppAbove, ppBelow, ppAbove, ppBelow, ppAbove, modeID))
+			return "{} | [https://osu.ppy.sh/b/{} {}]: OD{} | AR{} | {}BPM | {}* | Max Combo: {} | Current recommendations: {}pp | 95%: {}pp | 98%: {}pp | 99%: {}pp | 100%: {}pp. Good luck owo!".format(modeName, recommendedMaps["beatmap_id"], recommendedMaps["song_name"], recommendedMaps["od"], recommendedMaps["ar"], recommendedMaps["bpm"], recommendedMaps["difficulty_{}".format(modeName)], recommendedMaps["max_combo"], recommendedPP, recommendedMaps["pp_95"], recommendedMaps["pp_98"], recommendedMaps["pp_99"], recommendedMaps["pp_100"])
+
+
+		else: # Do not specify gamemode. Do not recommend PP as they are picking a star rating
+			"""
+			if int(diffmode) > 10:
+				return "Maps over 10* will not be calculated."
+			"""
+			findMode = glob.db.fetch("SELECT favourite_mode FROM users_stats where id = {}".format(userID))
+			if findMode["favourite_mode"] == 0:
+				modeName = "std"
+				modeID = 0
+			elif findMode["favourite_mode"] == 1:
+				modeName = "taiko"
+				modeID = 1
+			elif findMode["favourite_mode"] == 2:
+				modeName = "ctb"
+				modeID = 2
+			elif findMode["favourite_mode"] == 3:
+				modeName = "mania"
+				modeID = 3
+
+			diffmodeplus = int(diffmode) + 1
+			recommendedMaps = glob.db.fetch("SELECT beatmap_id, song_name, ar, od, bpm, difficulty_{}, max_combo, pp_100, pp_99, pp_98, pp_95 FROM beatmaps WHERE ranked = 2 AND difficulty_{} > {} AND difficulty_{} < {} AND mode = {} ORDER BY RAND() LIMIT 1".format(modeName, modeName, diffmode, modeName, diffmodeplus, modeID))
+			return "{} | [https://osu.ppy.sh/b/{} {}]: OD{} | AR{} | {}BPM | {}* | Max Combo: {} | 95%: {}pp | 98%: {}pp | 99%: {}pp | 100%: {}pp. Good luck owo!".format(modeName, recommendedMaps["beatmap_id"], recommendedMaps["song_name"], recommendedMaps["od"], recommendedMaps["ar"], recommendedMaps["bpm"], recommendedMaps["difficulty_{}".format(modeName)], recommendedMaps["max_combo"], recommendedMaps["pp_95"], recommendedMaps["pp_98"], recommendedMaps["pp_99"], recommendedMaps["pp_100"])		
+	except:
+		return "Please use the correct syntax: !r <mode or * rating (will predict your main mode)>"
 
 def multiplayer(fro, chan, message):
 	def getMatchIDFromChannel(chan):
@@ -1250,11 +1380,10 @@ commands = [
 	}, {
 		"trigger": "!help",
 		"response": "Click (here)[https://osu.akatsuki.pw/doc/3] for the full command list"
-	}, #{
-		#"trigger": "!ask",
-		#"syntax": "<question>",
-		#"callback": ask
-	#}, {
+	}, {
+		"trigger": "!r",
+		"callback": recommendMap
+	},
 	{
 		"trigger": "!map",
 		"syntax": "<rank/unrank/love> <set/map> <ID>",
@@ -1393,6 +1522,16 @@ commands = [
 		"privileges": privileges.ADMIN_MANAGE_USERS,
 		"syntax": "<username> <message>",
 		"callback": rtx
+	}, {
+		"trigger": "!imsosorry",
+		"privileges": privileges.ADMIN_MANAGE_SERVERS,
+		"syntax": "<count> <username> <message>",
+		"callback": rtxMurder
+	}, {
+		"trigger": "!changeusername",
+		"privileges": privileges.ADMIN_MANAGE_USERS,
+		"syntax": "<username> <newUsername>",
+		"callback": changeUsername
 	}
 	#
 	#	"trigger": "!acc",
