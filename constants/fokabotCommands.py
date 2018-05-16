@@ -208,12 +208,17 @@ def ban(fro, chan, message):
 	for i in message:
 		i = i.lower()
 	target = message[0]
+	reason = ' '.join(message[1:])
 
 	# Make sure the user exists
 	targetUserID = userUtils.getIDSafe(target)
+	username = chat.fixUsernameForBancho(fro)
 	userID = userUtils.getID(fro)
 	if not targetUserID:
 		return "{}: user not found".format(target)
+
+	if len(reason) <= 3:
+		return "Fuck you add a reason, dipshit."
 
 	# Set allowed to 0
 	userUtils.ban(targetUserID)
@@ -223,7 +228,8 @@ def ban(fro, chan, message):
 	if targetToken is not None:
 		targetToken.enqueue(serverPackets.loginBanned())
 
-	log.rap(userID, "has banned {}".format(target), True)
+	log.rap(userID, "has banned {} ({}) for {}".format(target, targetUserID, reason), True)
+	userUtils.appendNotes(targetUserID, "{} banned for: {}".format(username, reason))
 	return "{} has been banned.".format(target)
 
 def unban(fro, chan, message):
@@ -249,12 +255,17 @@ def restrict(fro, chan, message):
 	for i in message:
 		i = i.lower()
 	target = message[0]
+	reason = ' '.join(message[1:])
 
 	# Make sure the user exists
 	targetUserID = userUtils.getIDSafe(target)
+	username = chat.fixUsernameForBancho(fro)
 	userID = userUtils.getID(fro)
 	if not targetUserID:
 		return "{}: user not found".format(target)
+
+	if len(reason) <= 3:
+		return "Fuck you add a reason, dipshit."
 
 	# Put this user in restricted mode
 	userUtils.restrict(targetUserID)
@@ -264,7 +275,8 @@ def restrict(fro, chan, message):
 	if targetToken is not None:
 		targetToken.setRestricted()
 
-	log.rap(userID, "has put {} in restricted mode".format(target), True)
+	log.rap(userID, "has restricted {} ({}) for: {}".format(target, targetUserID, reason), True)
+	userUtils.appendNotes(targetUserID, "{} restricted for: {}".format(username, reason))
 	return "{} has been restricted.".format(target)
 
 def unrestrict(fro, chan, message):
