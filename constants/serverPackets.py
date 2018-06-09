@@ -52,7 +52,7 @@ def userSupporterGMT(supporter, GMT, tournamentStaff):
 	if supporter:
 		result |= userRanks.SUPPORTER
 	if GMT:
-		result |= userRanks.BAT
+		result |= userRanks.MOD
 	if tournamentStaff:
 		result |= userRanks.TOURNAMENT_STAFF
 	return packetHelper.buildPacket(packetIDs.server_supporterGMT, [[result, dataTypes.UINT32]])
@@ -98,7 +98,9 @@ def userPanel(userID, force = False):
 		userRank |= userRanks.MOD
 	elif userUtils.isInPrivilegeGroup(userID, "developer"):
 		userRank |= userRanks.ADMIN
-	elif userUtils.isInPrivilegeGroup(userID, "chat mod"):
+	elif userUtils.isInPrivilegeGroup(userID, "chat moderators"):
+		userRank |= userRanks.MOD
+	elif userUtils.isInPrivilegeGroup(userID, "Community Manager"):
 		userRank |= userRanks.MOD
 	elif (userToken.privileges & privileges.USER_DONOR) > 0:
 		userRank |= userRanks.SUPPORTER

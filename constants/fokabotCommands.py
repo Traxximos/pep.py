@@ -786,52 +786,48 @@ def editMap(fro, chan, message): # Edit maps ranking status ingame.
 	# Get persons username & ID
 	name = chat.fixUsernameForBancho(fro)
 	userID = userUtils.getID(fro)
+	userName = userUtils.getUsername(userID)
 
-	# Figure out what ranked status we're putting the map into.
+	# Figure out what to do
 	if rankType == 'rank':
 		rankTypeID = 2
 		freezeStatus = 1
-		edThing = 'ranked'
 	elif rankType == 'love':
 		rankTypeID = 5
 		freezeStatus = 1
-		edThing = 'loved'
 	elif rankType == 'unrank':
 		rankTypeID = 0
 		freezeStatus = 0
-		edThing = 'unranked'
-	else:
-		return "Please specify a valid ranked status (rank, love, unrank)."
-
-	# Figure out whether the user wants to change the whole set, or just the specific difficulty of the map.
-	if mapType == 'set':
-		ifSet = 'set'
-		linkType = 's'
-		plusifSet = " " + ifSet
-	elif mapType == 'map':
-		ifSet = ''
-		plusifSet = ''
-		linkType = 'b'
-	else:
-		return "Please specify a valid map type (map, set)."
 
 	# Grab beatmapData from db
-	beatmapData = glob.db.fetch("SELECT beatmap_id, beatmapset_id, song_name FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
+	beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
 
-	# Ensure the beatmap is actually selected. If not, /shrug.
-	if beatmapData is None:
-		return "Beatmap not found in the database. Please ensure you've loaded leaderboards for the beatmap{}.".format(plusifSet)
-
-	# Actually permform the ranked status changes, and if unfreeze is required, restore scores.
-	glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmap{}_id = {} LIMIT 100".format(rankTypeID, freezeStatus, ifSet, beatmapData["beatmap{}_id".format(ifSet)]))
-	if freezeStatus == 1:
-			glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
-				WHERE beatmap{}_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(ifSet, beatmapData["beatmap{}_id".format(ifSet)]))
+	if mapType == 'set':
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {}, rankedhere = {}, rankedby = {} WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, freezeStatus, rankTypeID, userID, beatmapData["beatmapset_id"]))
+		if freezeStatus == 1:
+				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
+					WHERE beatmapset_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmapset_id"]))
+	elif mapType == 'map':
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {}, rankedhere = {}, rankedby = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, rankTypeID, userID, mapID ))
+		if freezeStatus == 1:
+				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
+					WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmap_id"]))
+	else:
+		return "Please specify whether it is a set/map. eg: '!map unrank/rank/love set/map 123456'"
 
 	# Announce / Log to AP logs when ranked status is changed
-	log.rap(userID, "has {} beatmap{} ({}): {} ({}).".format(edThing, plusifSet, mapType, beatmapData["song_name"], mapID), True)
-	msg = "{} has {} beatmap{}: [https://osu.ppy.sh/{}/{} {}]".format(name, edThing, plusifSet, linkType, beatmapData["beatmap{}_id".format(ifSet)], beatmapData["song_name"])
-
+	if rankType == "love":
+		log.rap(userID, "has {}d beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
+		if mapType == 'set':
+			msg = "{} has loved beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, beatmapData["beatmapset_id"], beatmapData["song_name"])
+		else:
+			msg = "{} has loved beatmap: [https://osu.ppy.sh/s/{} {}]".format(name, mapID, beatmapData["song_name"])
+	else:
+		log.rap(userID, "has {}ed beatmap ({}): {} ({}).".format(rankType, mapType, beatmapData["song_name"], mapID), True)
+		if mapType == 'set':
+			msg = "{} has {}ed beatmap set: [https://osu.ppy.sh/s/{} {}]".format(name, rankType, beatmapData["beatmapset_id"], beatmapData["song_name"])
+		else:
+			msg = "{} has {}ed beatmap: [https://osu.ppy.sh/s/{} {}]".format(name, rankType, mapID, beatmapData["song_name"])
 	chat.sendMessage(glob.BOT_NAME, "#nowranked", msg)
 	return msg
 
