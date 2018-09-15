@@ -803,12 +803,12 @@ def editMap(fro, chan, message): # Edit maps ranking status ingame.
 	beatmapData = glob.db.fetch("SELECT * FROM beatmaps WHERE beatmap_id = {} LIMIT 1".format(mapID))
 
 	if mapType == 'set':
-		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {}, rankedhere = {}, rankedby = {} WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, freezeStatus, rankTypeID, userID, beatmapData["beatmapset_id"]))
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmapset_id = {} LIMIT 100".format(rankTypeID, freezeStatus, beatmapData["beatmapset_id"]))
 		if freezeStatus == 1:
 				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
 					WHERE beatmapset_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmapset_id"]))
 	elif mapType == 'map':
-		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {}, rankedhere = {}, rankedby = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, rankTypeID, userID, mapID ))
+		glob.db.execute("UPDATE beatmaps SET ranked = {}, ranked_status_freezed = {} WHERE beatmap_id = {} LIMIT 1".format(rankTypeID, freezeStatus, mapID ))
 		if freezeStatus == 1:
 				glob.db.execute("""UPDATE scores s JOIN (SELECT userid, MAX(score) maxscore FROM scores JOIN beatmaps ON scores.beatmap_md5 = beatmaps.beatmap_md5 WHERE beatmaps.beatmap_md5 = (SELECT beatmap_md5 FROM beatmaps
 					WHERE beatmap_id = {} LIMIT 1) GROUP BY userid) s2 ON s.score = s2.maxscore AND s.userid = s2.userid SET completed = 3""".format(beatmapData["beatmap_id"]))
